@@ -37,11 +37,13 @@ import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.Resol
 import org.gradle.api.internal.artifacts.repositories.AbstractArtifactRepository;
 import org.gradle.api.internal.artifacts.repositories.DefaultMavenLocalArtifactRepository;
 import org.gradle.api.internal.artifacts.repositories.ResolutionAwareRepository;
+import org.gradle.api.internal.artifacts.repositories.descriptor.RepositoryDescriptor;
 import org.gradle.api.internal.artifacts.repositories.resolver.ExternalResourceArtifactResolver;
 import org.gradle.api.internal.artifacts.repositories.resolver.ExternalResourceResolver;
 import org.gradle.api.internal.artifacts.repositories.resolver.MavenResolver;
 import org.gradle.api.internal.artifacts.repositories.resolver.MetadataFetchingCost;
 import org.gradle.api.internal.component.ArtifactType;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.internal.action.InstantiatingAction;
 import org.gradle.internal.component.external.model.ModuleComponentResolveMetadata;
 import org.gradle.internal.component.external.model.ModuleDependencyMetadata;
@@ -79,13 +81,13 @@ public class GradleRepositoryAdapter extends AbstractArtifactRepository implemen
             "^(?<group>\\S+(?:/\\S+)*)/(?<name>\\S+)/(?<version>\\S+)/" +
                     "\\2-\\3(?:-(?<classifier>[^.\\s]+))?\\.(?<extension>\\S+)$");
 
-    public static GradleRepositoryAdapter add(RepositoryHandler handler, String name, File local, Repository repository) {
+    public static GradleRepositoryAdapter add(RepositoryHandler handler, String name, File local, Repository repository, ObjectFactory objectFactory) {
         BaseRepositoryFactory factory = ReflectionUtils.get(handler, "repositoryFactory"); // We reflect here and create it manually so it DOESN'T get attached.
         DefaultMavenLocalArtifactRepository maven = (DefaultMavenLocalArtifactRepository)factory.createMavenLocalRepository(); // We use maven local because it bypasses the caching and coping to .m2
         maven.setUrl(local);
         maven.setName(name);
 
-        GradleRepositoryAdapter repo = new GradleRepositoryAdapter(repository, maven);
+        GradleRepositoryAdapter repo = new GradleRepositoryAdapter(repository, maven, objectFactory);
         repo.setName(name);
         handler.add(repo);
         return repo;
@@ -96,7 +98,8 @@ public class GradleRepositoryAdapter extends AbstractArtifactRepository implemen
     private final String root;
     private final LocatedArtifactCache cache;
 
-    private GradleRepositoryAdapter(Repository repository, DefaultMavenLocalArtifactRepository local) {
+    private GradleRepositoryAdapter(Repository repository, DefaultMavenLocalArtifactRepository local, ObjectFactory objectFactory) {
+        super(objectFactory);
         this.repository = repository;
         this.local = local;
         this.root = cleanRoot(local.getUrl());
@@ -180,6 +183,11 @@ public class GradleRepositoryAdapter extends AbstractArtifactRepository implemen
                 };
             }
         };
+    }
+
+    @Override
+    public RepositoryDescriptor getDescriptor() {
+        return local.getDescriptor();
     }
 
     private static String cleanRoot(URI uri) {
